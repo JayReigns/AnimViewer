@@ -84,21 +84,8 @@ class ANIMV_OT_SetSpeed(Operator):
     
     def execute(self, context):
         
-        ob = get_active_obj()
-        action = ob.animation_data.action
-
-        speed = self.speed
-        
-        scn = bpy.context.scene
-        rnd = scn.render
-        
-        scn.use_preview_range = True
-        scn.frame_preview_start = int(action.frame_range[0] / speed)
-        scn.frame_preview_end = int(action.frame_range[1] / speed)
-
-        scn.frame_current = scn.frame_preview_start
-        
-        rnd.frame_map_new = int(100 / speed)
+        props = get_global_props()
+        props.speed = self.speed
         
         return{'FINISHED'}
 
