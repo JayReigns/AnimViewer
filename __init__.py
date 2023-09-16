@@ -60,7 +60,10 @@ def update_animation(self, context):
 
     scn.frame_current = scn.frame_preview_start
     
-    rnd.frame_map_new = int(100 / speed)
+    # frame_map_old and frame_map_new are in range [1, 900]
+    length = min(900, action.frame_range[1] - action.frame_range[0] + 1)
+    rnd.frame_map_old = int(length)
+    rnd.frame_map_new = int(length / speed)
 
 
 #########################################################################################
