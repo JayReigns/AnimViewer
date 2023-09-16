@@ -119,13 +119,14 @@ class ANIMV_PT_Viewer(Panel):
     bl_category = "Animation"
 
     def draw(self, context):
+        layout = self.layout
         
         ob = get_active_obj()
         if not ob:
+            layout.label(text= "Select an Object/Armature", icon="POSE_HLT")
             return
         
-        layout = self.layout
-        layout.label(text = ob.name, icon="POSE_HLT")
+        layout.label(text= ob.name, icon="POSE_HLT")
         
         row = layout.row(align=True)
         for s in (0.25, 0.5, 1, 1.25, 1.5, 2):
