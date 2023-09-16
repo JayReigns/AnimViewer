@@ -13,6 +13,7 @@ from bpy.props import IntProperty, FloatProperty, EnumProperty, StringProperty, 
 from bpy.types import Operator, Menu, UIList, Panel, PropertyGroup, AddonPreferences
 
 
+# cache selected object incase hidden after selection
 def get_active_obj():
     if bpy.context.active_object:
         get_active_obj.obj = bpy.context.active_object
