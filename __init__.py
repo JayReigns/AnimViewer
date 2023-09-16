@@ -65,6 +65,12 @@ def update_animation(self, context):
     rnd.frame_map_old = int(length)
     rnd.frame_map_new = int(length / speed)
 
+    # In place
+    # this assumes only the first bone has root motion
+    # also the first 3 channels are XYZ
+    for i in range(3):
+        action.groups[0].channels[i].mute=True
+
 
 #########################################################################################
 # OPERATORS
