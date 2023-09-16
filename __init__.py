@@ -13,6 +13,9 @@ from bpy.props import IntProperty, FloatProperty, EnumProperty, StringProperty, 
 from bpy.types import Operator, Menu, UIList, Panel, PropertyGroup, AddonPreferences
 
 
+def get_global_props():
+    return bpy.context.window_manager.animv_props
+
 # cache selected object incase hidden after selection
 def get_active_obj():
     if bpy.context.active_object:
@@ -24,8 +27,10 @@ def get_active_obj():
         return None
 
 
-def update_anim_list(self, context):
-    
+def update_animation(self, context):
+
+    props = get_global_props()
+
     ob = get_active_obj()
     if not ob:
         return
@@ -44,13 +49,18 @@ def update_anim_list(self, context):
     action = bpy.data.actions[ob.anim_list_index]
     ob.animation_data.action = action
 
+    speed = props.speed
+        
     scn = bpy.context.scene
+    rnd = scn.render
     
     scn.use_preview_range = True
-    scn.frame_preview_start = int(action.frame_range[0])
-    scn.frame_preview_end = int(action.frame_range[1])
+    scn.frame_preview_start = int(action.frame_range[0] / speed)
+    scn.frame_preview_end = int(action.frame_range[1] / speed)
 
     scn.frame_current = scn.frame_preview_start
+    
+    rnd.frame_map_new = int(100 / speed)
 
 
 #########################################################################################
@@ -136,6 +146,21 @@ class ANIMV_PT_Viewer(Panel):
 
 
 #########################################################################################
+# PROPERTIES
+#########################################################################################
+
+
+class ANIMV_Props(PropertyGroup):
+
+    speed: FloatProperty(
+        name="Animation Speed",
+        description="Set Animation Speed",
+        update = update_animation,
+        default=1.0,
+    )
+
+
+#########################################################################################
 # REGISTER/UNREGISTER
 #########################################################################################
 
@@ -144,6 +169,7 @@ classes = (
     ANIMV_OT_SetSpeed,
     ANIMV_UL_Action_List,
     ANIMV_PT_Viewer,
+    ANIMV_Props,
 )
 
 
@@ -153,8 +179,12 @@ def register():
         bpy.utils.register_class(cls)
     
     bpy.types.Object.anim_list_index = IntProperty(
-        update = update_anim_list, 
+        update = update_animation, 
         description = "Anim Viewer's highlighted action on list for this object"
+    )
+    bpy.types.WindowManager.animv_props = PointerProperty(
+        type=ANIMV_Props,
+        name="ANIMV Props",
     )
 
 
