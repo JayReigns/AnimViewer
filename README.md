@@ -2,7 +2,7 @@
 Quickly preview Animations.
 
 ## Location
-`View3D > Tools > Animation`
+`View3D > Sidebar > Animation Tab`
 
 ## Other Addons
 - [API Browser](https://github.com/JayReigns/API_Browser) : Browse through the python api via Blender user interface
