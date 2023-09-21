@@ -68,8 +68,8 @@ def update_animation(self, context):
     # In place
     # this assumes only the first bone has root motion
     # also the first 3 channels are XYZ
-    for i in range(3):
-        action.groups[0].channels[i].mute=True
+    # for i in range(3):
+    #     action.groups[0].channels[i].mute=True
 
 
 #########################################################################################
