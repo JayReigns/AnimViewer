@@ -3,7 +3,7 @@ bl_info = {
     "author": "JayReigns",
     "version": (1, 0, 0),
     "blender": (2, 80, 0),
-    "location": "View3D > Tools > Animation",
+    "location": "View3D > Sidebar > Animation Tab",
     "description": "View and Assign all Actions",
     "category": "Animation"
 }
