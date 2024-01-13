@@ -71,25 +71,37 @@ def update_animation(self, context):
     rnd.frame_map_old = int(length)
     rnd.frame_map_new = int(length / speed)
 
-    def make_inplace(data_path):
+    def make_inplace(action, data_path, mute=True):
         x = action.fcurves.find(data_path, index=0)
         y = action.fcurves.find(data_path, index=1)
         z = action.fcurves.find(data_path, index=2)
-        if x: x.mute = props.inplace
-        if y: y.mute = props.inplace
-        if z: z.mute = props.inplace
+        if x: x.mute = mute
+        if y: y.mute = mute
+        if z: z.mute = mute
+
+    # check if we modified previous action
+    if props.action_changed_inplace:
+        prev_action = bpy.data.actions[props.action_changed_inplace]
+        data_path = props.data_path_changed_inplace
+        make_inplace(prev_action, data_path, mute=False)
 
     # inplace
-    if ob.pose: # for armatures
-        # blender maintains hierarchy order, so 0th bone is the root bone
-        # 0th bone also can be a stray bone and the root bone is next
-        root_name = ob.pose.bones[0].name
+    if props.inplace:
+        if ob.pose: # for armatures
+            # blender maintains hierarchy order, so 0th bone is the root bone
+            # 0th bone also can be a stray bone and the root bone is next
+            root_name = ob.pose.bones[0].name
 
-        # find location xyz fcurves
-        data_path = f'pose.bones["{root_name}"].location'
-        make_inplace(data_path)
-    else:
-        make_inplace('location')
+            # find location xyz fcurves
+            data_path = f'pose.bones["{root_name}"].location'
+        else:
+            data_path = 'location'
+        
+        make_inplace(action, data_path)
+        # used to revert changes
+        # TODO: add further check to detect which channels are changed
+        props.action_changed_inplace = action.name
+        props.data_path_changed_inplace = data_path
 
 
 #########################################################################################
@@ -178,9 +190,19 @@ class ANIMV_Props(PropertyGroup):
     )
     inplace: BoolProperty(
         name="In Place",
-        description="Make Animation Inplace (WARNING: Mutes Location channels and does not revert automatically)",
+        description="Make Animation Inplace (WARNING: Not permanent)",
         update = update_animation,
         default=False,
+    )
+    action_changed_inplace: StringProperty(
+        name="action_changed_innplace",
+        description="Action name used to track which action is modified",
+        default="",
+    )
+    data_path_changed_inplace: StringProperty(
+        name="data_path_changed_innplace",
+        description="data_path name used to track which action is modified",
+        default="",
     )
 
 
