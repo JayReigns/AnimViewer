@@ -38,15 +38,20 @@ def update_animation(self, context):
     if ob.animation_data == None:
         ob.animation_data_create()
     
+    def reset_pose(o):
+        o.location = (0, 0, 0)
+        o.rotation_quaternion = (1, 0, 0, 0)
+        o.rotation_axis_angle = (0, 0, 1, 0)
+        o.rotation_euler = (0, 0, 0)
+        o.scale = (1, 1, 1)
+
     # reset pose
-    if ob.pose: # only for armatures
+    if ob.pose: # for armatures
         for n in ob.pose.bones:
-            n.location = (0, 0, 0)
-            n.rotation_quaternion = (1, 0, 0, 0)
-            n.rotation_axis_angle = (0, 0, 1, 0)
-            n.rotation_euler = (0, 0, 0)
-            n.scale = (1, 1, 1)
-        
+            reset_pose(n)
+    else:
+        reset_pose(ob)
+    
     action = bpy.data.actions[ob.anim_list_index]
     ob.animation_data.action = action
 
@@ -66,11 +71,25 @@ def update_animation(self, context):
     rnd.frame_map_old = int(length)
     rnd.frame_map_new = int(length / speed)
 
-    # In place
-    # this assumes only the first bone has root motion
-    # also the first 3 channels are XYZ
-    # for i in range(3):
-    #     action.groups[0].channels[i].mute=True
+    def make_inplace(data_path):
+        x = action.fcurves.find(data_path, index=0)
+        y = action.fcurves.find(data_path, index=1)
+        z = action.fcurves.find(data_path, index=2)
+        if x: x.mute = props.inplace
+        if y: y.mute = props.inplace
+        if z: z.mute = props.inplace
+
+    # inplace
+    if ob.pose: # for armatures
+        # blender maintains hierarchy order, so 0th bone is the root bone
+        # 0th bone also can be a stray bone and the root bone is next
+        root_name = ob.pose.bones[0].name
+
+        # find location xyz fcurves
+        data_path = f'pose.bones["{root_name}"].location'
+        make_inplace(data_path)
+    else:
+        make_inplace('location')
 
 
 #########################################################################################
@@ -127,6 +146,7 @@ class ANIMV_PT_Viewer(Panel):
 
     def draw(self, context):
         layout = self.layout
+        props = get_global_props()
         
         ob = get_active_obj()
         if not ob:
@@ -134,6 +154,7 @@ class ANIMV_PT_Viewer(Panel):
             return
         
         layout.label(text= ob.name, icon="POSE_HLT")
+        layout.prop(props, "inplace")
         
         row = layout.row(align=True)
         for s in (0.25, 0.5, 1, 1.25, 1.5, 2):
@@ -154,6 +175,12 @@ class ANIMV_Props(PropertyGroup):
         description="Set Animation Speed",
         update = update_animation,
         default=1.0,
+    )
+    inplace: BoolProperty(
+        name="In Place",
+        description="Make Animation Inplace (WARNING: Mutes Location channels and does not revert automatically)",
+        update = update_animation,
+        default=False,
     )
 
 
