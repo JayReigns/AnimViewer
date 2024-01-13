@@ -39,12 +39,13 @@ def update_animation(self, context):
         ob.animation_data_create()
     
     # reset pose
-    for n in ob.pose.bones:
-        n.location = (0, 0, 0)
-        n.rotation_quaternion = (1, 0, 0, 0)
-        n.rotation_axis_angle = (0, 0, 1, 0)
-        n.rotation_euler = (0, 0, 0)
-        n.scale = (1, 1, 1)
+    if ob.pose: # only for armatures
+        for n in ob.pose.bones:
+            n.location = (0, 0, 0)
+            n.rotation_quaternion = (1, 0, 0, 0)
+            n.rotation_axis_angle = (0, 0, 1, 0)
+            n.rotation_euler = (0, 0, 0)
+            n.scale = (1, 1, 1)
         
     action = bpy.data.actions[ob.anim_list_index]
     ob.animation_data.action = action
