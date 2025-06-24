@@ -93,6 +93,7 @@ def update_animation(self, context):
         if ob.pose: # for armatures
             # blender maintains hierarchy order, so 0th bone is the root bone
             # 0th bone also can be a stray bone and the root bone is next
+            # TODO: use pose.bone_groups to detect stray bones
             root_name = ob.pose.bones[0].name
 
             # find location xyz fcurves
@@ -101,6 +102,8 @@ def update_animation(self, context):
             data_path = 'location'
         
         make_inplace(action, data_path)
+        # some armatures also have object animation
+        make_inplace(action, 'location')
         # used to revert changes
         # TODO: add further check to detect which channels are changed
         props.action_changed_inplace = action.name
