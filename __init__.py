@@ -54,6 +54,7 @@ def update_animation(self, context):
         reset_pose(ob)
     
     action = bpy.data.actions[ob.anim_list_index]
+    is_same_action = (ob.animation_data.action == action)
     ob.animation_data.action = action
     if bpy.app.version >= (4, 4, 0):
         ob.animation_data.action_slot = action.slots[0]
@@ -68,7 +69,8 @@ def update_animation(self, context):
     scn.frame_preview_start = int(action.frame_range[0] / speed)
     scn.frame_preview_end = int(action.frame_range[1] / speed)
 
-    scn.frame_current = scn.frame_preview_start
+    if not is_same_action: # reset frame to start only if action is changed
+        scn.frame_current = scn.frame_preview_start
     
     # frame_map_old and frame_map_new are in range [1, 900]
     length = min(900, action.frame_range[1] - action.frame_range[0] + 1)
