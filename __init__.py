@@ -9,9 +9,10 @@ bl_info = {
 }
 
 import bpy
-from bpy.props import IntProperty, FloatProperty, EnumProperty, StringProperty, BoolProperty, PointerProperty
+from bpy.props import IntProperty, FloatProperty, EnumProperty, StringProperty, BoolProperty, BoolVectorProperty, PointerProperty
 from bpy.types import Operator, Menu, UIList, Panel, PropertyGroup, AddonPreferences
 
+LOCATION_CONSTRAINT_NAME = "AnimV Inplace Constraint"
 
 def get_global_props():
     return bpy.context.window_manager.animv_props
@@ -74,40 +75,34 @@ def update_animation(self, context):
     rnd.frame_map_old = int(length)
     rnd.frame_map_new = int(length / speed)
 
-    def make_inplace(action, data_path, mute=True):
-        x = action.fcurves.find(data_path, index=0)
-        y = action.fcurves.find(data_path, index=1)
-        z = action.fcurves.find(data_path, index=2)
-        if x: x.mute = mute
-        if y: y.mute = mute
-        if z: z.mute = mute
-
-    # check if we modified previous action
-    if props.action_changed_inplace:
-        prev_action = bpy.data.actions[props.action_changed_inplace]
-        data_path = props.data_path_changed_inplace
-        make_inplace(prev_action, data_path, mute=False)
+    lim_loc_constr = ob.constraints.get(LOCATION_CONSTRAINT_NAME)
 
     # inplace
-    if props.inplace:
-        if ob.pose: # for armatures
-            # blender maintains hierarchy order, so 0th bone is the root bone
-            # 0th bone also can be a stray bone and the root bone is next
-            # TODO: use pose.bone_groups to detect stray bones
-            root_name = ob.pose.bones[0].name
-
-            # find location xyz fcurves
-            data_path = f'pose.bones["{root_name}"].location'
-        else:
-            data_path = 'location'
+    if any(props.inplace_axes):
+        if not lim_loc_constr:
+            lim_loc_constr = ob.constraints.new('LIMIT_LOCATION')
+            lim_loc_constr.name = LOCATION_CONSTRAINT_NAME
         
-        make_inplace(action, data_path)
-        # some armatures also have object animation
-        make_inplace(action, 'location')
-        # used to revert changes
-        # TODO: add further check to detect which channels are changed
-        props.action_changed_inplace = action.name
-        props.data_path_changed_inplace = data_path
+        lim_loc_constr.use_min_x = props.inplace_axes[0]
+        lim_loc_constr.use_max_x = props.inplace_axes[0]
+        lim_loc_constr.min_x = 0.0
+        lim_loc_constr.max_x = 0.0
+        lim_loc_constr.use_min_y = props.inplace_axes[1]
+        lim_loc_constr.use_max_y = props.inplace_axes[1]
+        lim_loc_constr.min_y = 0.0
+        lim_loc_constr.max_y = 0.0
+        lim_loc_constr.use_min_z = props.inplace_axes[2]
+        lim_loc_constr.use_max_z = props.inplace_axes[2]
+        lim_loc_constr.min_z = 0.0
+        lim_loc_constr.max_z = 0.0
+        lim_loc_constr.owner_space = 'WORLD'
+        lim_loc_constr.influence = 1.0
+
+    elif lim_loc_constr:
+        # remove existing inplace constraint
+        for c in ob.constraints:
+            if c.name == LOCATION_CONSTRAINT_NAME:
+                ob.constraints.remove(c)
 
 
 #########################################################################################
@@ -172,9 +167,10 @@ class ANIMV_PT_Viewer(Panel):
             return
         
         layout.label(text= ob.name, icon="POSE_HLT")
-        layout.prop(props, "inplace")
-        
+        layout.prop( props, "inplace_axes" , toggle = True) 
+
         row = layout.row(align=True)
+        row.label(text="Speed:")
         for s in (0.25, 0.5, 1, 1.25, 1.5, 2):
             row.operator(ANIMV_OT_SetSpeed.bl_idname, text=str(s)).speed = s
         
@@ -194,21 +190,12 @@ class ANIMV_Props(PropertyGroup):
         update = update_animation,
         default=1.0,
     )
-    inplace: BoolProperty(
-        name="In Place",
-        description="Make Animation Inplace (WARNING: Not permanent)",
+    inplace_axes: BoolVectorProperty(  
+        name = "Inplace", 
+        description = "Limit translations in these axes (Uses Constraints)",
         update = update_animation,
-        default=False,
-    )
-    action_changed_inplace: StringProperty(
-        name="action_changed_innplace",
-        description="Action name used to track which action is modified",
-        default="",
-    )
-    data_path_changed_inplace: StringProperty(
-        name="data_path_changed_innplace",
-        description="data_path name used to track which action is modified",
-        default="",
+        default = (False, False, False),
+        subtype = 'XYZ',
     )
 
 
