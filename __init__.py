@@ -54,6 +54,9 @@ def update_animation(self, context):
     
     action = bpy.data.actions[ob.anim_list_index]
     ob.animation_data.action = action
+    if bpy.app.version >= (4, 4, 0):
+        ob.animation_data.action_slot = action.slots[0]
+
 
     speed = props.speed
         
