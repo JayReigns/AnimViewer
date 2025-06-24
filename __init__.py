@@ -60,7 +60,7 @@ def update_animation(self, context):
         ob.animation_data.action_slot = action.slots[0]
 
 
-    speed = props.speed
+    speed = float(props.speed)
         
     scn = bpy.context.scene
     rnd = scn.render
@@ -112,27 +112,6 @@ def update_animation(self, context):
 #########################################################################################
 
 
-class ANIMV_OT_SetSpeed(Operator):
-    """Sets animation speed"""
-    bl_idname = "animv.set_speed"
-    bl_label = "Set Animation Speed"
-    
-    speed : FloatProperty(name="Animation Speed", default=1.0)
-    
-    @classmethod
-    def poll(cls, context):
-        ob = get_active_obj()
-        return ob is not None \
-            and ob.animation_data is not None \
-            and ob.animation_data.action is not None \
-    
-    def execute(self, context):
-        
-        props = get_global_props()
-        props.speed = self.speed
-        
-        return{'FINISHED'}
-
 
 #########################################################################################
 # PANELS
@@ -169,13 +148,12 @@ class ANIMV_PT_Viewer(Panel):
             return
         
         layout.label(text= ob.name, icon="POSE_HLT")
-        layout.prop( props, "inplace_axes" , toggle = True) 
+        layout.prop(props, "inplace_axes", toggle = True) 
 
         row = layout.row(align=True)
         row.label(text="Speed:")
-        for s in (0.25, 0.5, 1, 1.25, 1.5, 2):
-            row.operator(ANIMV_OT_SetSpeed.bl_idname, text=str(s)).speed = s
-        
+        row.prop(props, 'speed', expand=True)
+
         layout.template_list("ANIMV_UL_Action_List", "", bpy.data, "actions", ob, "anim_list_index")
 
 
@@ -185,12 +163,19 @@ class ANIMV_PT_Viewer(Panel):
 
 
 class ANIMV_Props(PropertyGroup):
-
-    speed: FloatProperty(
-        name="Animation Speed",
-        description="Set Animation Speed",
+    speed : bpy.props.EnumProperty(
+        name='speed', 
+        description='Animation playback speed',
         update = update_animation,
-        default=1.0,
+        items=[
+            ('0.25', '0.25', ''), 
+            ('0.5', '0.5', ''), 
+            ('1', '1', ''),
+            ('1.25', '1.25', ''),
+            ('1.5', '1.5', ''),
+            ('2', '2', ''),
+        ],
+        default="1",
     )
     inplace_axes: BoolVectorProperty(  
         name = "Inplace", 
@@ -207,7 +192,6 @@ class ANIMV_Props(PropertyGroup):
 
 
 classes = (
-    ANIMV_OT_SetSpeed,
     ANIMV_UL_Action_List,
     ANIMV_PT_Viewer,
     ANIMV_Props,
