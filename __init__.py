@@ -72,10 +72,15 @@ def update_animation(self, context):
     if not is_same_action: # reset frame to start only if action is changed
         scn.frame_current = scn.frame_preview_start
     
-    # frame_map_old and frame_map_new are in range [1, 900]
-    length = min(900, action.frame_range[1] - action.frame_range[0] + 1)
-    rnd.frame_map_old = int(length)
-    rnd.frame_map_new = int(length / speed)
+    if speed == 1.0:
+        # reset frame mapping
+        rnd.frame_map_old = 100
+        rnd.frame_map_new = 100
+    else:
+        # frame_map_old and frame_map_new are in range [1, 900]
+        length = min(900, action.frame_range[1] - action.frame_range[0] + 1)
+        rnd.frame_map_old = int(length)
+        rnd.frame_map_new = int(length / speed)
 
     lim_loc_constr = ob.constraints.get(LOCATION_CONSTRAINT_NAME)
 
