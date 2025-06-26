@@ -18,14 +18,18 @@ def get_global_props():
     return bpy.context.window_manager.animv_props
 
 # cache selected object incase hidden after selection
+_cached_obj = None
 def get_active_obj():
-    if bpy.context.active_object:
-        get_active_obj.obj = bpy.context.active_object
+    global _cached_obj
+
+    pinned = get_global_props().pin_object
+
+    # if pinned retuen the previous object if not None
+    if pinned and _cached_obj:
+        return _cached_obj
     
-    try:
-        return get_active_obj.obj
-    except:
-        return None
+    _cached_obj = bpy.context.active_object
+    return _cached_obj
 
 
 def update_animation(self, context):
@@ -152,7 +156,10 @@ class ANIMV_PT_Viewer(Panel):
             layout.label(text= "Select an Object/Armature", icon="POSE_HLT")
             return
         
-        layout.label(text= ob.name, icon="POSE_HLT")
+        row = layout.row(align=True)
+        row.label(text= ob.name, icon="POSE_HLT")
+        row.prop(props, 'pin_object', text="", icon='PINNED' if props.pin_object else 'UNPINNED')
+
         layout.prop(props, "inplace_axes", toggle = True) 
 
         row = layout.row(align=True)
@@ -168,6 +175,13 @@ class ANIMV_PT_Viewer(Panel):
 
 
 class ANIMV_Props(PropertyGroup):
+    pin_object: BoolProperty(
+        name="pin_object",
+        description="Pin current object regardless of selection",
+        # DONT UPDATE: updating causes to apply animation, when unpinned on different object
+        #update = update_animation,
+        default=False,
+    )
     speed : bpy.props.EnumProperty(
         name='speed', 
         description='Animation playback speed',
