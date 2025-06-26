@@ -120,7 +120,39 @@ def update_animation(self, context):
 # OPERATORS
 #########################################################################################
 
+class ANIMV_OT_UnlinkAction(Operator):
+    """Sets animation speed"""
+    bl_idname = "animv.unlink_action"
+    bl_label = "Remove Action"
+    bl_description = "Unlink the action from the object"
+        
+    @classmethod
+    def poll(cls, context):
+        ob = get_active_obj()
+        return ob is not None \
+            and ob.animation_data is not None \
+            and ob.animation_data.action is not None \
+    
+    def execute(self, context):
+        ob = get_active_obj()
+        ob.animation_data.action = None
 
+        # reset settings
+        scn = bpy.context.scene
+        rnd = scn.render
+
+        scn.use_preview_range = False
+
+        # reset frame mapping
+        rnd.frame_map_old = 100
+        rnd.frame_map_new = 100
+
+        # remove existing inplace constraint
+        for c in ob.constraints:
+            if c.name == LOCATION_CONSTRAINT_NAME:
+                ob.constraints.remove(c)
+        
+        return{'FINISHED'}
 
 #########################################################################################
 # PANELS
@@ -133,6 +165,13 @@ class ANIMV_UL_Action_List(UIList):
         
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             layout.prop(item, "name", text="", emboss=False, icon="ACTION")
+
+            ob = active_data
+            action = item
+            # draw cancel button if the action is linked to the object
+            if ob.animation_data and ob.animation_data.action == action:
+                layout.operator("animv.unlink_action", text="", icon='CANCEL', emboss=False)
+            
         elif self.layout_type in {'GRID'}:
             pass
         global filter_name2
@@ -211,6 +250,7 @@ class ANIMV_Props(PropertyGroup):
 
 
 classes = (
+    ANIMV_OT_UnlinkAction,
     ANIMV_UL_Action_List,
     ANIMV_PT_Viewer,
     ANIMV_Props,
