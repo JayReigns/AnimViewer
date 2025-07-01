@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Anim Viewer",
     "author": "JayReigns",
-    "version": (1, 0, 0),
+    "version": (1, 1, 0),
     "blender": (2, 80, 0),
     "location": "View3D > Sidebar > Animation Tab",
     "description": "View and Assign all Actions",
