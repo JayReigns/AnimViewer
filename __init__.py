@@ -32,60 +32,41 @@ def get_active_obj():
     return _cached_obj
 
 
-def update_animation(self, context):
-
+def update_speed(self, context):
     props = get_global_props()
-
-    ob = get_active_obj()
-    if not ob:
-        return
-    
-    if ob.animation_data == None:
-        ob.animation_data_create()
-    
-    def reset_pose(o):
-        o.location = (0, 0, 0)
-        o.rotation_quaternion = (1, 0, 0, 0)
-        o.rotation_axis_angle = (0, 0, 1, 0)
-        o.rotation_euler = (0, 0, 0)
-        o.scale = (1, 1, 1)
-
-    # reset pose
-    if ob.pose: # for armatures
-        for n in ob.pose.bones:
-            reset_pose(n)
-    else:
-        reset_pose(ob)
-    
-    action = bpy.data.actions[ob.anim_list_index]
-    is_same_action = (ob.animation_data.action == action)
-    ob.animation_data.action = action
-    if bpy.app.version >= (4, 4, 0):
-        ob.animation_data.action_slot = action.slots[0]
-
-
-    speed = float(props.speed)
-        
     scn = bpy.context.scene
     rnd = scn.render
-    
-    # scn.use_preview_range = True # now using dedicated button
-    scn.frame_preview_start = int(action.frame_range[0] / speed)
-    scn.frame_preview_end = int(action.frame_range[1] / speed)
-
-    if not is_same_action: # reset frame to start only if action is changed
-        scn.frame_current = scn.frame_preview_start
+    speed = float(props.speed)
     
     if speed == 1.0:
         # reset frame mapping
         rnd.frame_map_old = 100
         rnd.frame_map_new = 100
-    else:
-        # frame_map_old and frame_map_new are in range [1, 900]
-        length = min(900, action.frame_range[1] - action.frame_range[0] + 1)
-        rnd.frame_map_old = int(length)
-        rnd.frame_map_new = int(length / speed)
+        return
 
+    frame_duration = 100
+
+    ob = get_active_obj()
+    if ob and ob.animation_data and ob.animation_data.action:
+        action = ob.animation_data.action
+        frame_start = action.frame_range[0]
+        frame_end = action.frame_range[1]
+
+        frame_duration = frame_end - frame_start + 1
+
+        scn.frame_preview_start = int(frame_start / speed)
+        scn.frame_preview_end = int(frame_end / speed)
+    
+    rnd.frame_map_old = int(frame_duration)
+    rnd.frame_map_new = int(frame_duration / speed)
+
+
+def update_constraints(self, context):
+    props = get_global_props()
+    ob = get_active_obj()
+    if not ob:
+        return
+    
     lim_loc_constr = ob.constraints.get(LOCATION_CONSTRAINT_NAME)
 
     # inplace
@@ -115,6 +96,44 @@ def update_animation(self, context):
             if c.name == LOCATION_CONSTRAINT_NAME:
                 ob.constraints.remove(c)
 
+
+def update_animation(self, context):
+
+    props = get_global_props()
+
+    ob = get_active_obj()
+    if not ob:
+        return
+    
+    if ob.animation_data == None:
+        ob.animation_data_create()
+    
+    def reset_pose(o):
+        o.location = (0, 0, 0)
+        o.rotation_quaternion = (1, 0, 0, 0)
+        o.rotation_axis_angle = (0, 0, 1, 0)
+        o.rotation_euler = (0, 0, 0)
+        o.scale = (1, 1, 1)
+
+    # reset pose
+    if ob.pose: # for armatures
+        for n in ob.pose.bones:
+            reset_pose(n)
+    else:
+        reset_pose(ob)
+    
+    action = bpy.data.actions[ob.anim_list_index]
+    ob.animation_data.action = action
+
+    if bpy.app.version >= (4, 4, 0):
+        ob.animation_data.action_slot = action.slots[0]
+
+    update_speed(self, context)
+        
+    # reset frame to start
+    scn = bpy.context.scene
+    scn.frame_current = scn.frame_preview_start
+    
 
 #########################################################################################
 # OPERATORS
@@ -252,7 +271,7 @@ class ANIMV_Props(PropertyGroup):
     speed : bpy.props.EnumProperty(
         name='speed', 
         description='Animation playback speed',
-        update = update_animation,
+        update = update_speed,
         items=[
             ('0.25', '0.25', ''), 
             ('0.5', '0.5', ''), 
@@ -266,7 +285,7 @@ class ANIMV_Props(PropertyGroup):
     inplace_axes: BoolVectorProperty(  
         name = "Inplace", 
         description = "Limit translations in these axes (Uses Constraints)",
-        update = update_animation,
+        update = update_constraints,
         default = (False, False, False),
         subtype = 'XYZ',
     )
