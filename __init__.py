@@ -159,6 +159,29 @@ class ANIMV_OT_UnlinkAction(Operator):
 #########################################################################################
 
 
+def update_anim_list_index():
+    ob = get_active_obj()
+    
+    if ob and ob.animation_data and ob.animation_data.action:
+        ui_action_name = bpy.data.actions[ob.anim_list_index].name
+        data_action_name = ob.animation_data.action.name
+        if ui_action_name != data_action_name:
+            bpy.app.timers.register(my_timer_function, first_interval=0)
+    
+    # no need to update if ob is None or has no action
+    # since UIList active_index cant be None or -1 to make nothing selected
+
+
+def my_timer_function():
+    print(f"Timer executed")
+    ob = get_active_obj()
+    if ob and ob.animation_data and ob.animation_data.action:
+        idx = bpy.data.actions.find(ob.animation_data.action.name)
+        ob.anim_list_index = idx
+    # no need to update if ob is None or has no action
+    # return None # Returning None will keep the timer active
+
+
 class ANIMV_UL_Action_List(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         self.use_filter_show = True
@@ -195,6 +218,10 @@ class ANIMV_PT_Viewer(Panel):
             layout.label(text= "Select an Object/Armature", icon="POSE_HLT")
             return
         
+        # hack to detect blender data changes in ui context
+        # and update using app.timer
+        update_anim_list_index()
+
         row = layout.row(align=True)
         row.label(text= ob.name, icon="POSE_HLT")
         row.prop(props, 'pin_object', text="", icon='PINNED' if props.pin_object else 'UNPINNED')
