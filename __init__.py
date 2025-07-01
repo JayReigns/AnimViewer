@@ -69,7 +69,7 @@ def update_animation(self, context):
     scn = bpy.context.scene
     rnd = scn.render
     
-    scn.use_preview_range = True
+    # scn.use_preview_range = True # now using dedicated button
     scn.frame_preview_start = int(action.frame_range[0] / speed)
     scn.frame_preview_end = int(action.frame_range[1] / speed)
 
@@ -198,6 +198,7 @@ class ANIMV_PT_Viewer(Panel):
         row = layout.row(align=True)
         row.label(text= ob.name, icon="POSE_HLT")
         row.prop(props, 'pin_object', text="", icon='PINNED' if props.pin_object else 'UNPINNED')
+        row.prop(bpy.context.scene, "use_preview_range", icon_only=True)
 
         layout.prop(props, "inplace_axes", toggle = True) 
 
