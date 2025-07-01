@@ -70,21 +70,21 @@ def update_constraints(self, context):
     lim_loc_constr = ob.constraints.get(LOCATION_CONSTRAINT_NAME)
 
     # inplace
-    if any(props.inplace_axes):
+    if any(ob.inplace_axes):
         if not lim_loc_constr:
             lim_loc_constr = ob.constraints.new('LIMIT_LOCATION')
             lim_loc_constr.name = LOCATION_CONSTRAINT_NAME
         
-        lim_loc_constr.use_min_x = props.inplace_axes[0]
-        lim_loc_constr.use_max_x = props.inplace_axes[0]
+        lim_loc_constr.use_min_x = ob.inplace_axes[0]
+        lim_loc_constr.use_max_x = ob.inplace_axes[0]
         lim_loc_constr.min_x = 0.0
         lim_loc_constr.max_x = 0.0
-        lim_loc_constr.use_min_y = props.inplace_axes[1]
-        lim_loc_constr.use_max_y = props.inplace_axes[1]
+        lim_loc_constr.use_min_y = ob.inplace_axes[1]
+        lim_loc_constr.use_max_y = ob.inplace_axes[1]
         lim_loc_constr.min_y = 0.0
         lim_loc_constr.max_y = 0.0
-        lim_loc_constr.use_min_z = props.inplace_axes[2]
-        lim_loc_constr.use_max_z = props.inplace_axes[2]
+        lim_loc_constr.use_min_z = ob.inplace_axes[2]
+        lim_loc_constr.use_max_z = ob.inplace_axes[2]
         lim_loc_constr.min_z = 0.0
         lim_loc_constr.max_z = 0.0
         lim_loc_constr.owner_space = 'WORLD'
@@ -192,7 +192,6 @@ def update_anim_list_index():
 
 
 def my_timer_function():
-    print(f"Timer executed")
     ob = get_active_obj()
     if ob and ob.animation_data and ob.animation_data.action:
         idx = bpy.data.actions.find(ob.animation_data.action.name)
@@ -206,7 +205,7 @@ class ANIMV_UL_Action_List(UIList):
         self.use_filter_show = True
         
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
-            layout.prop(item, "name", text="", emboss=False, icon="ACTION")
+            layout.prop(item, "name", text="", emboss=False, icon_value=icon)
 
             ob = active_data
             action = item
@@ -246,7 +245,7 @@ class ANIMV_PT_Viewer(Panel):
         row.prop(props, 'pin_object', text="", icon='PINNED' if props.pin_object else 'UNPINNED')
         row.prop(bpy.context.scene, "use_preview_range", icon_only=True)
 
-        layout.prop(props, "inplace_axes", toggle = True) 
+        layout.prop(ob, "inplace_axes", toggle = True) 
 
         row = layout.row(align=True)
         row.label(text="Speed:")
@@ -282,13 +281,6 @@ class ANIMV_Props(PropertyGroup):
         ],
         default="1",
     )
-    inplace_axes: BoolVectorProperty(  
-        name = "Inplace", 
-        description = "Limit translations in these axes (Uses Constraints)",
-        update = update_constraints,
-        default = (False, False, False),
-        subtype = 'XYZ',
-    )
 
 
 #########################################################################################
@@ -312,6 +304,13 @@ def register():
     bpy.types.Object.anim_list_index = IntProperty(
         update = update_animation, 
         description = "Anim Viewer's highlighted action on list for this object"
+    )
+    bpy.types.Object.inplace_axes= BoolVectorProperty(  
+        name = "Inplace", 
+        description = "Limit translations in these axes (Uses Constraints)",
+        update = update_constraints,
+        default = (False, False, False),
+        subtype = 'XYZ',
     )
     bpy.types.WindowManager.animv_props = PointerProperty(
         type=ANIMV_Props,
