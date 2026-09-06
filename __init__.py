@@ -38,12 +38,6 @@ def update_speed(self, context):
     rnd = scn.render
     speed = float(props.speed)
     
-    if speed == 1.0:
-        # reset frame mapping
-        rnd.frame_map_old = 100
-        rnd.frame_map_new = 100
-        return
-
     frame_duration = 100
 
     ob = get_active_obj()
