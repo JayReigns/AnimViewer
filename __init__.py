@@ -70,21 +70,21 @@ def update_constraints(self, context):
     lim_loc_constr = ob.constraints.get(LOCATION_CONSTRAINT_NAME)
 
     # inplace
-    if any(ob.inplace_axes):
+    if any(self.inplace_axes):
         if not lim_loc_constr:
             lim_loc_constr = ob.constraints.new('LIMIT_LOCATION')
             lim_loc_constr.name = LOCATION_CONSTRAINT_NAME
         
-        lim_loc_constr.use_min_x = ob.inplace_axes[0]
-        lim_loc_constr.use_max_x = ob.inplace_axes[0]
+        lim_loc_constr.use_min_x = self.inplace_axes[0]
+        lim_loc_constr.use_max_x = self.inplace_axes[0]
         lim_loc_constr.min_x = 0.0
         lim_loc_constr.max_x = 0.0
-        lim_loc_constr.use_min_y = ob.inplace_axes[1]
-        lim_loc_constr.use_max_y = ob.inplace_axes[1]
+        lim_loc_constr.use_min_y = self.inplace_axes[1]
+        lim_loc_constr.use_max_y = self.inplace_axes[1]
         lim_loc_constr.min_y = 0.0
         lim_loc_constr.max_y = 0.0
-        lim_loc_constr.use_min_z = ob.inplace_axes[2]
-        lim_loc_constr.use_max_z = ob.inplace_axes[2]
+        lim_loc_constr.use_min_z = self.inplace_axes[2]
+        lim_loc_constr.use_max_z = self.inplace_axes[2]
         lim_loc_constr.min_z = 0.0
         lim_loc_constr.max_z = 0.0
         lim_loc_constr.owner_space = 'WORLD'
@@ -122,7 +122,7 @@ def update_animation(self, context):
     else:
         reset_pose(ob)
     
-    action = bpy.data.actions[ob.anim_list_index]
+    action = bpy.data.actions[self.anim_list_index]
     ob.animation_data.action = action
 
     if bpy.app.version >= (4, 4, 0):
@@ -182,7 +182,7 @@ def update_anim_list_index():
     ob = get_active_obj()
     
     if ob and ob.animation_data and ob.animation_data.action:
-        ui_action_name = bpy.data.actions[ob.anim_list_index].name
+        ui_action_name = bpy.data.actions[ob.animv_props.anim_list_index].name
         data_action_name = ob.animation_data.action.name
         if ui_action_name != data_action_name:
             bpy.app.timers.register(my_timer_function, first_interval=0)
@@ -195,7 +195,7 @@ def my_timer_function():
     ob = get_active_obj()
     if ob and ob.animation_data and ob.animation_data.action:
         idx = bpy.data.actions.find(ob.animation_data.action.name)
-        ob.anim_list_index = idx
+        ob.animv_props.anim_list_index = idx
     # no need to update if ob is None or has no action
     # return None # Returning None will keep the timer active
 
@@ -207,7 +207,7 @@ class ANIMV_UL_Action_List(UIList):
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             layout.prop(item, "name", text="", emboss=False, icon_value=icon)
 
-            ob = active_data
+            ob = get_active_obj()
             action = item
             # draw cancel button if the action is linked to the object
             if ob.animation_data and ob.animation_data.action == action:
@@ -245,18 +245,32 @@ class ANIMV_PT_Viewer(Panel):
         row.prop(props, 'pin_object', text="", icon='PINNED' if props.pin_object else 'UNPINNED')
         row.prop(bpy.context.scene, "use_preview_range", icon_only=True)
 
-        layout.prop(ob, "inplace_axes", toggle = True) 
+        layout.prop(ob.animv_props, "inplace_axes", toggle = True) 
 
         row = layout.row(align=True)
         row.label(text="Speed:")
         row.prop(props, 'speed', expand=True)
 
-        layout.template_list("ANIMV_UL_Action_List", "", bpy.data, "actions", ob, "anim_list_index")
+        layout.template_list("ANIMV_UL_Action_List", "", bpy.data, "actions", ob.animv_props, "anim_list_index")
 
 
 #########################################################################################
 # PROPERTIES
 #########################################################################################
+
+
+class ANIMV_Object_Props(PropertyGroup):
+    anim_list_index: IntProperty(
+        update=update_animation,
+        description="Anim Viewer's highlighted action on list for this object"
+    )
+    inplace_axes: BoolVectorProperty(
+        name="Inplace",
+        description="Limit translations in these axes (Uses Constraints)",
+        update=update_constraints,
+        default=(False, False, False),
+        subtype='XYZ',
+    )
 
 
 class ANIMV_Props(PropertyGroup):
@@ -292,6 +306,7 @@ classes = (
     ANIMV_OT_UnlinkAction,
     ANIMV_UL_Action_List,
     ANIMV_PT_Viewer,
+    ANIMV_Object_Props,
     ANIMV_Props,
 )
 
@@ -301,16 +316,9 @@ def register():
     for cls in classes:
         bpy.utils.register_class(cls)
     
-    bpy.types.Object.anim_list_index = IntProperty(
-        update = update_animation, 
-        description = "Anim Viewer's highlighted action on list for this object"
-    )
-    bpy.types.Object.inplace_axes= BoolVectorProperty(  
-        name = "Inplace", 
-        description = "Limit translations in these axes (Uses Constraints)",
-        update = update_constraints,
-        default = (False, False, False),
-        subtype = 'XYZ',
+    bpy.types.Object.animv_props = PointerProperty(
+        type=ANIMV_Object_Props,
+        name="ANIMV Object Props",
     )
     bpy.types.WindowManager.animv_props = PointerProperty(
         type=ANIMV_Props,
@@ -320,7 +328,7 @@ def register():
 
 def unregister():
 
-    del bpy.types.Object.anim_list_index
+    del bpy.types.Object.animv_props
 
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
