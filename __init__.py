@@ -15,33 +15,17 @@ from bpy.types import Operator, UIList, Panel, PropertyGroup
 
 LOCATION_CONSTRAINT_NAME = "AnimV Inplace Constraint"
 
-def get_global_props():
+def get_global_properties():
     return bpy.context.window_manager.animv_props
 
-def get_active_obj():
-    props = get_global_props()
+def get_active_object():
+    props = get_global_properties()
 
     # if props.is_pinned and props.pinned_obj:
     #     return props.pinned_obj
 
     # props.pinned_obj = bpy.context.active_object
     return props.pinned_obj
-
-
-def update_pinned_obj_property(self, context):
-    # clearing pinned object causes a flicker in ui
-    # as it is immediately updated from panel draw update
-    if not self.pinned_obj:
-        self.pinned_obj = context.active_object
-        return
-
-    if self.pinned_obj and context.view_layer:
-        previous_obj = context.view_layer.objects.active
-        if previous_obj and previous_obj != self.pinned_obj:
-            previous_obj.select_set(False)
-
-        self.pinned_obj.select_set(True)
-        context.view_layer.objects.active = self.pinned_obj
 
 
 #########################################################################################
@@ -129,15 +113,31 @@ def get_inplace_axes(ob, props):
 #########################################################################################
 
 
+def on_pinned_object_changed(self, context):
+    # clearing pinned object causes a flicker in ui
+    # as it is immediately updated from panel draw update
+    if not self.pinned_obj:
+        self.pinned_obj = context.active_object
+        return
+
+    if self.pinned_obj and context.view_layer:
+        previous_obj = context.view_layer.objects.active
+        if previous_obj and previous_obj != self.pinned_obj:
+            previous_obj.select_set(False)
+
+        self.pinned_obj.select_set(True)
+        context.view_layer.objects.active = self.pinned_obj
+
+
 def update_speed(self, context):
-    props = get_global_props()
+    props = get_global_properties()
     scn = bpy.context.scene
     rnd = scn.render
     speed = float(props.speed)
     
     frame_duration = 100
 
-    ob = get_active_obj()
+    ob = get_active_object()
     if ob and ob.animation_data and ob.animation_data.action:
         action = ob.animation_data.action
         frame_start = action.frame_range[0]
@@ -153,8 +153,26 @@ def update_speed(self, context):
     rnd.frame_map_new = int(frame_duration / speed)
 
 
+def get_constraint_targets(ob):
+    if ob.type == 'ARMATURE':
+        return [
+            ob.pose.bones[bone.name]
+            for bone in ob.data.bones
+            if bone.parent is None
+        ]
+
+    return [ob]
+
+
+def remove_inplace_constraints(ob):
+    for target in get_constraint_targets(ob):
+        constraint = target.constraints.get(LOCATION_CONSTRAINT_NAME)
+        if constraint:
+            target.constraints.remove(constraint)
+
+
 def update_constraints(self, context):
-    ob = get_active_obj()
+    ob = get_active_object()
     if not ob:
         return
 
@@ -189,29 +207,11 @@ def update_constraints(self, context):
             target.constraints.remove(lim_loc_constr)
 
 
-def get_constraint_targets(ob):
-    if ob.type == 'ARMATURE':
-        return [
-            ob.pose.bones[bone.name]
-            for bone in ob.data.bones
-            if bone.parent is None
-        ]
-
-    return [ob]
-
-
-def remove_inplace_constraints(ob):
-    for target in get_constraint_targets(ob):
-        constraint = target.constraints.get(LOCATION_CONSTRAINT_NAME)
-        if constraint:
-            target.constraints.remove(constraint)
-
-
 def update_animation(self, context):
 
-    props = get_global_props()
+    props = get_global_properties()
 
-    ob = get_active_obj()
+    ob = get_active_object()
     if not ob:
         return
     
@@ -258,13 +258,13 @@ class ANIMV_OT_UnlinkAction(Operator):
         
     @classmethod
     def poll(cls, context):
-        ob = get_active_obj()
+        ob = get_active_object()
         return ob is not None \
             and ob.animation_data is not None \
             and ob.animation_data.action is not None \
     
     def execute(self, context):
-        ob = get_active_obj()
+        ob = get_active_object()
         ob.animation_data.action = None
 
         # reset settings
@@ -287,8 +287,8 @@ class ANIMV_OT_UnlinkAction(Operator):
 #########################################################################################
 
 
-def update_anim_list_index(context):
-    ob = get_active_obj()
+def sync_anim_list_index(context):
+    ob = get_active_object()
 
     # no need to update if ob is None or has no action
     # since UIList active_index cant be None or -1 to make nothing selected
@@ -299,7 +299,7 @@ def update_anim_list_index(context):
             area = context.area
 
             def update_index():
-                current_ob = get_active_obj()
+                current_ob = get_active_object()
                 if current_ob and current_ob.animation_data and current_ob.animation_data.action:
                     idx = bpy.data.actions.find(current_ob.animation_data.action.name)
                     current_ob.animv_props.anim_list_index = idx
@@ -311,14 +311,14 @@ def update_anim_list_index(context):
 
 
 
-def update_pinned_obj(context):
-    props = get_global_props()
+def sync_pinned_object(context):
+    props = get_global_properties()
     active_obj = bpy.context.active_object
     if not props.is_pinned and props.pinned_obj != active_obj:
         area = context.area
 
         def update_object():
-            props = get_global_props()
+            props = get_global_properties()
             if not props.is_pinned:
                 props.pinned_obj = bpy.context.active_object
 
@@ -335,7 +335,7 @@ class ANIMV_UL_Action_List(UIList):
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             layout.prop(item, "name", text="", emboss=False, icon_value=icon)
 
-            ob = get_active_obj()
+            ob = get_active_object()
             action = item
             # draw cancel button if the action is linked to the object
             if ob.animation_data and ob.animation_data.action == action:
@@ -360,25 +360,25 @@ class ANIMV_PT_Viewer(Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False  # No animation.
         
-        props = get_global_props()
+        props = get_global_properties()
 
         # hack to detect blender data changes in ui context
         # and update using app.timer
-        update_pinned_obj(context)
+        sync_pinned_object(context)
 
         row = layout.row(align=True)
         row.prop(props, "pinned_obj", text="Object")
         row.prop(props, 'is_pinned', text="", icon='PINNED' if props.is_pinned else 'UNPINNED')
         row.prop(bpy.context.scene, "use_preview_range", icon_only=True)
         
-        ob = get_active_obj()
+        ob = get_active_object()
         if not ob:
             layout.label(text= "Select an Object/Armature", icon="POSE_HLT")
             return
         
         # hack to detect blender data changes in ui context
         # and update using app.timer
-        update_anim_list_index(context)
+        sync_anim_list_index(context)
 
         row = layout.row(align=True)
         row.enabled = (
@@ -422,22 +422,22 @@ class ANIMV_Object_Props(PropertyGroup):
     )
 
 
-class ANIMV_Props(PropertyGroup):
+class ANIMV_WindowManager_Props(PropertyGroup):
     pinned_obj: PointerProperty(
         type=bpy.types.Object,
         name="Pinned Object",
         description="The object used when the viewer is pinned",
-        update=update_pinned_obj_property,
+        update=on_pinned_object_changed,
     )
     is_pinned: BoolProperty(
-        name="is_pinned",
+        name="Pinned",
         description="Pin current object regardless of selection",
         # DONT UPDATE: updating causes to apply animation, when unpinned on different object
         #update = update_animation,
         default=False,
     )
     speed : bpy.props.EnumProperty(
-        name='speed', 
+        name="Speed",
         description='Animation playback speed',
         update = update_speed,
         items=[
@@ -463,7 +463,7 @@ classes = (
     ANIMV_UL_Action_List,
     ANIMV_PT_Viewer,
     ANIMV_Object_Props,
-    ANIMV_Props,
+    ANIMV_WindowManager_Props,
 )
 
 
@@ -477,7 +477,7 @@ def register():
         name="ANIMV Object Props",
     )
     bpy.types.WindowManager.animv_props = PointerProperty(
-        type=ANIMV_Props,
+        type=ANIMV_WindowManager_Props,
         name="ANIMV Props",
     )
 
