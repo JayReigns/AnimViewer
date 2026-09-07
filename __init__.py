@@ -146,14 +146,7 @@ def update_constraints(self, context):
     if not ob:
         return
 
-    if ob.type == 'ARMATURE':
-        targets = [
-            ob.pose.bones[bone.name]
-            for bone in ob.data.bones
-            if bone.parent is None
-        ]
-    else:
-        targets = [ob]
+    targets = get_constraint_targets(ob)
 
     axes = get_inplace_axes(ob, self)
 
@@ -182,6 +175,24 @@ def update_constraints(self, context):
 
         elif lim_loc_constr:
             target.constraints.remove(lim_loc_constr)
+
+
+def get_constraint_targets(ob):
+    if ob.type == 'ARMATURE':
+        return [
+            ob.pose.bones[bone.name]
+            for bone in ob.data.bones
+            if bone.parent is None
+        ]
+
+    return [ob]
+
+
+def remove_inplace_constraints(ob):
+    for target in get_constraint_targets(ob):
+        constraint = target.constraints.get(LOCATION_CONSTRAINT_NAME)
+        if constraint:
+            target.constraints.remove(constraint)
 
 
 def update_animation(self, context):
@@ -254,7 +265,7 @@ class ANIMV_OT_UnlinkAction(Operator):
         rnd.frame_map_old = 100
         rnd.frame_map_new = 100
 
-        update_constraints(ob.animv_props, context)
+        remove_inplace_constraints(ob)
         
         return{'FINISHED'}
 
