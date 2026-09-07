@@ -344,6 +344,10 @@ class ANIMV_PT_Viewer(Panel):
         row.prop(bpy.context.scene, "use_preview_range", icon_only=True)
 
         row = layout.row(align=True)
+        row.enabled = (
+            ob.animation_data is not None
+            and ob.animation_data.action is not None
+        )
         row.prop(ob.animv_props, "inplace_axes", text="Inplace")
 
         row = layout.row(align=True)
