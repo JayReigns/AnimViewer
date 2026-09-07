@@ -373,7 +373,7 @@ class ANIMV_UL_Action_List(UIList):
             action = item
             # draw cancel button if the action is linked to the object
             if ob.animation_data and ob.animation_data.action == action:
-                layout.operator("animv.unlink_action", text="", icon='CANCEL', emboss=False)
+                layout.operator("animv.unlink_action", text="", icon='PANEL_CLOSE', emboss=False)
             
         elif self.layout_type in {'GRID'}:
             pass
