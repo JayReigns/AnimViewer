@@ -136,6 +136,7 @@ def update_speed(self, context):
 
         scn.frame_preview_start = int(frame_start / speed)
         scn.frame_preview_end = int(frame_end / speed)
+        scn.use_preview_range = True
     
     rnd.frame_map_old = int(frame_duration)
     rnd.frame_map_new = int(frame_duration / speed)
