@@ -327,6 +327,9 @@ class ANIMV_PT_Viewer(Panel):
 
     def draw(self, context):
         layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False  # No animation.
+        
         props = get_global_props()
         
         ob = get_active_obj()
@@ -351,8 +354,7 @@ class ANIMV_PT_Viewer(Panel):
         row.prop(ob.animv_props, "inplace_axes", text="Inplace")
 
         row = layout.row(align=True)
-        row.label(text="Speed:")
-        row.prop(props, 'speed', expand=True)
+        row.prop(props, 'speed', text="Speed")
 
         layout.template_list("ANIMV_UL_Action_List", "", bpy.data, "actions", ob.animv_props, "anim_list_index")
 
@@ -399,12 +401,13 @@ class ANIMV_Props(PropertyGroup):
         description='Animation playback speed',
         update = update_speed,
         items=[
-            ('0.25', '0.25', ''), 
-            ('0.5', '0.5', ''), 
-            ('1', '1', ''),
-            ('1.25', '1.25', ''),
-            ('1.5', '1.5', ''),
-            ('2', '2', ''),
+            ('0.25', '0.25x (Slow)', ''), 
+            ('0.5', '0.5x', ''), 
+            ('0.75', '0.75x', ''),
+            ('1', '1x (Normal)', ''),
+            ('1.25', '1.25x', ''),
+            ('1.5', '1.5x', ''),
+            ('2', '2x (Fast)', ''),
         ],
         default="1",
     )
