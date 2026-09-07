@@ -282,6 +282,40 @@ class ANIMV_OT_UnlinkAction(Operator):
         return{'FINISHED'}
 
 
+class ANIMV_OT_ResetRootLock(Operator):
+    """Reset root lock to no locked axes"""
+    bl_idname = "animv.reset_root_lock"
+    bl_label = "Reset Root Lock"
+    bl_description = "Reset root lock"
+
+    @classmethod
+    def poll(cls, context):
+        ob = get_active_object()
+        return ob is not None and ob.animv_props.inplace_axes != 'NONE'
+
+    def execute(self, context):
+        ob = get_active_object()
+        if ob:
+            ob.animv_props.inplace_axes = 'NONE'
+
+        return {'FINISHED'}
+
+
+class ANIMV_OT_ResetPlaybackSpeed(Operator):
+    """Reset playback speed to normal"""
+    bl_idname = "animv.reset_playback_speed"
+    bl_label = "Reset Playback Speed"
+    bl_description = "Reset playback speed to normal"
+
+    @classmethod
+    def poll(cls, context):
+        return get_global_properties().speed != '1'
+
+    def execute(self, context):
+        get_global_properties().speed = '1'
+        return {'FINISHED'}
+
+
 #########################################################################################
 # PANELS
 #########################################################################################
@@ -386,9 +420,11 @@ class ANIMV_PT_Viewer(Panel):
             and ob.animation_data.action is not None
         )
         row.prop(ob.animv_props, "inplace_axes")
+        row.operator("animv.reset_root_lock", text="", icon='PANEL_CLOSE')
 
         row = layout.row(align=True)
         row.prop(props, 'speed')
+        row.operator("animv.reset_playback_speed", text="", icon='PANEL_CLOSE')
 
         layout.template_list("ANIMV_UL_Action_List", "", bpy.data, "actions", ob.animv_props, "anim_list_index")
 
@@ -460,6 +496,8 @@ class ANIMV_WindowManager_Props(PropertyGroup):
 
 classes = (
     ANIMV_OT_UnlinkAction,
+    ANIMV_OT_ResetRootLock,
+    ANIMV_OT_ResetPlaybackSpeed,
     ANIMV_UL_Action_List,
     ANIMV_PT_Viewer,
     ANIMV_Object_Props,
