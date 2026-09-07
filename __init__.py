@@ -467,7 +467,7 @@ class ANIMV_WindowManager_Props(PropertyGroup):
     )
     is_pinned: BoolProperty(
         name="Pinned",
-        description="Pin current object regardless of selection",
+        description="Don't update based on viewport selection",
         # DONT UPDATE: updating causes to apply animation, when unpinned on different object
         #update = update_animation,
         default=False,
