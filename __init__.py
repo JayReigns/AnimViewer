@@ -21,11 +21,27 @@ def get_global_props():
 def get_active_obj():
     props = get_global_props()
 
-    if props.is_pinned and props.pinned_obj:
-        return props.pinned_obj
+    # if props.is_pinned and props.pinned_obj:
+    #     return props.pinned_obj
 
-    props.pinned_obj = bpy.context.active_object
+    # props.pinned_obj = bpy.context.active_object
     return props.pinned_obj
+
+
+def update_pinned_obj_property(self, context):
+    # clearing pinned object causes a flicker in ui
+    # as it is immediately updated from panel draw update
+    if not self.pinned_obj:
+        self.pinned_obj = context.active_object
+        return
+
+    if self.pinned_obj and context.view_layer:
+        previous_obj = context.view_layer.objects.active
+        if previous_obj and previous_obj != self.pinned_obj:
+            previous_obj.select_set(False)
+
+        self.pinned_obj.select_set(True)
+        context.view_layer.objects.active = self.pinned_obj
 
 
 #########################################################################################
@@ -271,26 +287,45 @@ class ANIMV_OT_UnlinkAction(Operator):
 #########################################################################################
 
 
-def update_anim_list_index():
+def update_anim_list_index(context):
     ob = get_active_obj()
-    
+
+    # no need to update if ob is None or has no action
+    # since UIList active_index cant be None or -1 to make nothing selected
     if ob and ob.animation_data and ob.animation_data.action:
         ui_action_name = bpy.data.actions[ob.animv_props.anim_list_index].name
         data_action_name = ob.animation_data.action.name
         if ui_action_name != data_action_name:
-            bpy.app.timers.register(my_timer_function, first_interval=0)
-    
-    # no need to update if ob is None or has no action
-    # since UIList active_index cant be None or -1 to make nothing selected
+            area = context.area
+
+            def update_index():
+                current_ob = get_active_obj()
+                if current_ob and current_ob.animation_data and current_ob.animation_data.action:
+                    idx = bpy.data.actions.find(current_ob.animation_data.action.name)
+                    current_ob.animv_props.anim_list_index = idx
+
+                if area:
+                    area.tag_redraw()
+
+            bpy.app.timers.register(update_index, first_interval=0)
 
 
-def my_timer_function():
-    ob = get_active_obj()
-    if ob and ob.animation_data and ob.animation_data.action:
-        idx = bpy.data.actions.find(ob.animation_data.action.name)
-        ob.animv_props.anim_list_index = idx
-    # no need to update if ob is None or has no action
-    # return None # Returning None will keep the timer active
+
+def update_pinned_obj(context):
+    props = get_global_props()
+    active_obj = bpy.context.active_object
+    if not props.is_pinned and props.pinned_obj != active_obj:
+        area = context.area
+
+        def update_object():
+            props = get_global_props()
+            if not props.is_pinned:
+                props.pinned_obj = bpy.context.active_object
+
+            if area:
+                area.tag_redraw()
+
+        bpy.app.timers.register(update_object, first_interval=0)
 
 
 class ANIMV_UL_Action_List(UIList):
@@ -326,6 +361,15 @@ class ANIMV_PT_Viewer(Panel):
         layout.use_property_decorate = False  # No animation.
         
         props = get_global_props()
+
+        # hack to detect blender data changes in ui context
+        # and update using app.timer
+        update_pinned_obj(context)
+
+        row = layout.row(align=True)
+        row.prop(props, "pinned_obj", text="Object")
+        row.prop(props, 'is_pinned', text="", icon='PINNED' if props.is_pinned else 'UNPINNED')
+        row.prop(bpy.context.scene, "use_preview_range", icon_only=True)
         
         ob = get_active_obj()
         if not ob:
@@ -334,12 +378,7 @@ class ANIMV_PT_Viewer(Panel):
         
         # hack to detect blender data changes in ui context
         # and update using app.timer
-        update_anim_list_index()
-
-        row = layout.row(align=True)
-        row.label(text= ob.name, icon="POSE_HLT")
-        row.prop(props, 'is_pinned', text="", icon='PINNED' if props.is_pinned else 'UNPINNED')
-        row.prop(bpy.context.scene, "use_preview_range", icon_only=True)
+        update_anim_list_index(context)
 
         row = layout.row(align=True)
         row.enabled = (
@@ -388,6 +427,7 @@ class ANIMV_Props(PropertyGroup):
         type=bpy.types.Object,
         name="Pinned Object",
         description="The object used when the viewer is pinned",
+        update=update_pinned_obj_property,
     )
     is_pinned: BoolProperty(
         name="is_pinned",
