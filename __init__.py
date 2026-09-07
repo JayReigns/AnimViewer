@@ -18,19 +18,14 @@ LOCATION_CONSTRAINT_NAME = "AnimV Inplace Constraint"
 def get_global_props():
     return bpy.context.window_manager.animv_props
 
-# cache selected object incase hidden after selection
-_cached_obj = None
 def get_active_obj():
-    global _cached_obj
+    props = get_global_props()
 
-    pinned = get_global_props().pin_object
+    if props.is_pinned and props.pinned_obj:
+        return props.pinned_obj
 
-    # if pinned retuen the previous object if not None
-    if pinned and _cached_obj:
-        return _cached_obj
-    
-    _cached_obj = bpy.context.active_object
-    return _cached_obj
+    props.pinned_obj = bpy.context.active_object
+    return props.pinned_obj
 
 
 #########################################################################################
@@ -343,7 +338,7 @@ class ANIMV_PT_Viewer(Panel):
 
         row = layout.row(align=True)
         row.label(text= ob.name, icon="POSE_HLT")
-        row.prop(props, 'pin_object', text="", icon='PINNED' if props.pin_object else 'UNPINNED')
+        row.prop(props, 'is_pinned', text="", icon='PINNED' if props.is_pinned else 'UNPINNED')
         row.prop(bpy.context.scene, "use_preview_range", icon_only=True)
 
         row = layout.row(align=True)
@@ -389,8 +384,13 @@ class ANIMV_Object_Props(PropertyGroup):
 
 
 class ANIMV_Props(PropertyGroup):
-    pin_object: BoolProperty(
-        name="pin_object",
+    pinned_obj: PointerProperty(
+        type=bpy.types.Object,
+        name="Pinned Object",
+        description="The object used when the viewer is pinned",
+    )
+    is_pinned: BoolProperty(
+        name="is_pinned",
         description="Pin current object regardless of selection",
         # DONT UPDATE: updating causes to apply animation, when unpinned on different object
         #update = update_animation,
