@@ -367,9 +367,9 @@ class ANIMV_PT_Viewer(Panel):
         sync_pinned_object(context)
 
         row = layout.row(align=True)
-        row.prop(props, "pinned_obj", text="Object")
+        row.prop(props, "pinned_obj")
         row.prop(props, 'is_pinned', text="", icon='PINNED' if props.is_pinned else 'UNPINNED')
-        row.prop(bpy.context.scene, "use_preview_range", icon_only=True)
+        # row.prop(bpy.context.scene, "use_preview_range", icon_only=True)
         
         ob = get_active_object()
         if not ob:
@@ -385,10 +385,10 @@ class ANIMV_PT_Viewer(Panel):
             ob.animation_data is not None
             and ob.animation_data.action is not None
         )
-        row.prop(ob.animv_props, "inplace_axes", text="Inplace")
+        row.prop(ob.animv_props, "inplace_axes")
 
         row = layout.row(align=True)
-        row.prop(props, 'speed', text="Speed")
+        row.prop(props, 'speed')
 
         layout.template_list("ANIMV_UL_Action_List", "", bpy.data, "actions", ob.animv_props, "anim_list_index")
 
@@ -404,19 +404,19 @@ class ANIMV_Object_Props(PropertyGroup):
         description="Anim Viewer's highlighted action on list for this object"
     )
     inplace_axes: EnumProperty(
-        name="Inplace",
+        name="Lock Root",
         description="Limit translations in these axes (Uses Constraints)",
         update=update_constraints,
         items=[
             ('NONE', 'None', 'Do not limit translation'),
             ('AUTO', 'Auto', 'Detect primary translation axes from the active action'),
-            ('X', 'X', 'Limit X translation'),
-            ('Y', 'Y', 'Limit Y translation'),
-            ('Z', 'Z', 'Limit Z translation'),
-            ('XY', 'XY', 'Limit X and Y translation'),
-            ('XZ', 'XZ', 'Limit X and Z translation'),
-            ('YZ', 'YZ', 'Limit Y and Z translation'),
-            ('XYZ', 'XYZ', 'Limit X, Y, and Z translation'),
+            ('X', 'X axis', 'Limit X translation'),
+            ('Y', 'Y axis', 'Limit Y translation'),
+            ('Z', 'Z axis', 'Limit Z translation'),
+            ('XY', 'XY axis', 'Limit X and Y translation'),
+            ('XZ', 'XZ axis', 'Limit X and Z translation'),
+            ('YZ', 'YZ axis', 'Limit Y and Z translation'),
+            ('XYZ', 'XYZ axis', 'Limit X, Y, and Z translation'),
         ],
         default='NONE',
     )
@@ -425,7 +425,7 @@ class ANIMV_Object_Props(PropertyGroup):
 class ANIMV_WindowManager_Props(PropertyGroup):
     pinned_obj: PointerProperty(
         type=bpy.types.Object,
-        name="Pinned Object",
+        name="Active Object",
         description="The object used when the viewer is pinned",
         update=on_pinned_object_changed,
     )
@@ -437,7 +437,7 @@ class ANIMV_WindowManager_Props(PropertyGroup):
         default=False,
     )
     speed : bpy.props.EnumProperty(
-        name="Speed",
+        name="Playback Speed",
         description='Animation playback speed',
         update = update_speed,
         items=[
