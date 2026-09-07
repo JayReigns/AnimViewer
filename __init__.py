@@ -10,8 +10,8 @@ bl_info = {
 
 import bpy
 from mathutils import Vector
-from bpy.props import IntProperty, FloatProperty, EnumProperty, StringProperty, BoolProperty, BoolVectorProperty, PointerProperty
-from bpy.types import Operator, Menu, UIList, Panel, PropertyGroup, AddonPreferences
+from bpy.props import IntProperty, EnumProperty, BoolProperty, PointerProperty
+from bpy.types import Operator, UIList, Panel, PropertyGroup
 
 LOCATION_CONSTRAINT_NAME = "AnimV Inplace Constraint"
 
@@ -31,6 +31,91 @@ def get_active_obj():
     
     _cached_obj = bpy.context.active_object
     return _cached_obj
+
+
+#########################################################################################
+# MOTION ANALYSIS FOR INLACE AXES DETECTION
+#########################################################################################
+
+
+def get_max_displacement_vector(action, data_path, start_frame, end_frame):
+    fcurves = {
+        fcurve.array_index: fcurve
+        for fcurve in action.fcurves
+        if fcurve.data_path == data_path and fcurve.array_index < 3
+    }
+    sample_count = min(max(2, int(end_frame - start_frame) + 1), 120)
+    frames = [
+        start_frame + (end_frame - start_frame) * index / (sample_count - 1)
+        for index in range(sample_count)
+    ]
+    start_location = Vector((
+        fcurves[axis].evaluate(start_frame) if axis in fcurves else 0.0
+        for axis in range(3)
+    ))
+    max_displacement = Vector((0.0, 0.0, 0.0))
+    max_distance_squared = 0.0
+
+    for frame in frames[1:]:
+        location = Vector((
+            fcurves[axis].evaluate(frame) if axis in fcurves else 0.0
+            for axis in range(3)
+        ))
+        displacement = location - start_location
+        distance_squared = displacement.length_squared
+        if distance_squared > max_distance_squared:
+            max_distance_squared = distance_squared
+            max_displacement = displacement
+
+    return max_displacement
+
+
+def detect_inplace_axes(ob, action):
+    start_frame, end_frame = action.frame_range
+    world_rotation = ob.matrix_world.to_3x3()
+    world_axis_scores = [0.0, 0.0, 0.0]
+
+    if ob.type == 'ARMATURE':
+        roots = [bone for bone in ob.data.bones if bone.parent is None]
+        for bone in roots:
+            data_path = f'pose.bones["{bone.name}"].location'
+            displacement = get_max_displacement_vector(
+                action, data_path, start_frame, end_frame
+            )
+            world_displacement = (
+                world_rotation @ bone.matrix_local.to_3x3() @ displacement
+            )
+            for axis in range(3):
+                world_axis_scores[axis] += world_displacement[axis] ** 2
+    else:
+        displacement = get_max_displacement_vector(
+            action, 'location', start_frame, end_frame
+        )
+        world_displacement = world_rotation @ displacement
+        for axis in range(3):
+            world_axis_scores[axis] += world_displacement[axis] ** 2
+
+    if max(world_axis_scores) < 0.0001:
+        return (False, False, False)
+
+    axis = max(range(3), key=world_axis_scores.__getitem__)
+    result = [False, False, False]
+    result[axis] = True
+    return tuple(result)
+
+
+def get_inplace_axes(ob, props):
+    if props.inplace_axes == 'AUTO':
+        if ob.animation_data and ob.animation_data.action:
+            return detect_inplace_axes(ob, ob.animation_data.action)
+        return (False, False, False)
+
+    return tuple(axis in props.inplace_axes for axis in 'XYZ')
+
+
+#########################################################################################
+# PROPERTY UPDATES
+#########################################################################################
 
 
 def update_speed(self, context):
@@ -137,81 +222,6 @@ def update_animation(self, context):
     scn = bpy.context.scene
     scn.frame_current = scn.frame_preview_start
     
-
-def get_max_displacement_vector(action, data_path, start_frame, end_frame):
-    fcurves = {
-        fcurve.array_index: fcurve
-        for fcurve in action.fcurves
-        if fcurve.data_path == data_path and fcurve.array_index < 3
-    }
-    sample_count = min(max(2, int(end_frame - start_frame) + 1), 120)
-    frames = [
-        start_frame + (end_frame - start_frame) * index / (sample_count - 1)
-        for index in range(sample_count)
-    ]
-    start_location = Vector((
-        fcurves[axis].evaluate(start_frame) if axis in fcurves else 0.0
-        for axis in range(3)
-    ))
-    max_displacement = Vector((0.0, 0.0, 0.0))
-    max_distance_squared = 0.0
-
-    for frame in frames[1:]:
-        location = Vector((
-            fcurves[axis].evaluate(frame) if axis in fcurves else 0.0
-            for axis in range(3)
-        ))
-        displacement = location - start_location
-        distance_squared = displacement.length_squared
-        if distance_squared > max_distance_squared:
-            max_distance_squared = distance_squared
-            max_displacement = displacement
-
-    return max_displacement
-
-
-def detect_inplace_axes(ob, action):
-    start_frame, end_frame = action.frame_range
-    world_rotation = ob.matrix_world.to_3x3()
-    world_axis_scores = [0.0, 0.0, 0.0]
-
-    if ob.type == 'ARMATURE':
-        roots = [bone for bone in ob.data.bones if bone.parent is None]
-        for bone in roots:
-            data_path = f'pose.bones["{bone.name}"].location'
-            displacement = get_max_displacement_vector(
-                action, data_path, start_frame, end_frame
-            )
-            world_displacement = (
-                world_rotation @ bone.matrix_local.to_3x3() @ displacement
-            )
-            for axis in range(3):
-                world_axis_scores[axis] += world_displacement[axis] ** 2
-    else:
-        displacement = get_max_displacement_vector(
-            action, 'location', start_frame, end_frame
-        )
-        world_displacement = world_rotation @ displacement
-        for axis in range(3):
-            world_axis_scores[axis] += world_displacement[axis] ** 2
-
-    if max(world_axis_scores) < 0.0001:
-        return (False, False, False)
-
-    axis = max(range(3), key=world_axis_scores.__getitem__)
-    result = [False, False, False]
-    result[axis] = True
-    return tuple(result)
-
-
-def get_inplace_axes(ob, props):
-    if props.inplace_axes == 'AUTO':
-        if ob.animation_data and ob.animation_data.action:
-            return detect_inplace_axes(ob, ob.animation_data.action)
-        return (False, False, False)
-
-    return tuple(axis in props.inplace_axes for axis in 'XYZ')
-
 
 #########################################################################################
 # OPERATORS
