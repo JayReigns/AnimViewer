@@ -9,6 +9,7 @@ bl_info = {
 }
 
 import bpy
+from mathutils import Vector
 from bpy.props import IntProperty, FloatProperty, EnumProperty, StringProperty, BoolProperty, BoolVectorProperty, PointerProperty
 from bpy.types import Operator, Menu, UIList, Panel, PropertyGroup, AddonPreferences
 
@@ -56,39 +57,46 @@ def update_speed(self, context):
 
 
 def update_constraints(self, context):
-    props = get_global_props()
     ob = get_active_obj()
     if not ob:
         return
-    
-    lim_loc_constr = ob.constraints.get(LOCATION_CONSTRAINT_NAME)
 
-    # inplace
-    if any(self.inplace_axes):
-        if not lim_loc_constr:
-            lim_loc_constr = ob.constraints.new('LIMIT_LOCATION')
-            lim_loc_constr.name = LOCATION_CONSTRAINT_NAME
-        
-        lim_loc_constr.use_min_x = self.inplace_axes[0]
-        lim_loc_constr.use_max_x = self.inplace_axes[0]
-        lim_loc_constr.min_x = 0.0
-        lim_loc_constr.max_x = 0.0
-        lim_loc_constr.use_min_y = self.inplace_axes[1]
-        lim_loc_constr.use_max_y = self.inplace_axes[1]
-        lim_loc_constr.min_y = 0.0
-        lim_loc_constr.max_y = 0.0
-        lim_loc_constr.use_min_z = self.inplace_axes[2]
-        lim_loc_constr.use_max_z = self.inplace_axes[2]
-        lim_loc_constr.min_z = 0.0
-        lim_loc_constr.max_z = 0.0
-        lim_loc_constr.owner_space = 'WORLD'
-        lim_loc_constr.influence = 1.0
+    if ob.type == 'ARMATURE':
+        targets = [
+            ob.pose.bones[bone.name]
+            for bone in ob.data.bones
+            if bone.parent is None
+        ]
+    else:
+        targets = [ob]
 
-    elif lim_loc_constr:
-        # remove existing inplace constraint
-        for c in ob.constraints:
-            if c.name == LOCATION_CONSTRAINT_NAME:
-                ob.constraints.remove(c)
+    axes = get_inplace_axes(ob, self)
+
+    for target in targets:
+        lim_loc_constr = target.constraints.get(LOCATION_CONSTRAINT_NAME)
+
+        if any(axes):
+            if not lim_loc_constr:
+                lim_loc_constr = target.constraints.new('LIMIT_LOCATION')
+                lim_loc_constr.name = LOCATION_CONSTRAINT_NAME
+
+            lim_loc_constr.use_min_x = axes[0]
+            lim_loc_constr.use_max_x = axes[0]
+            lim_loc_constr.min_x = 0.0
+            lim_loc_constr.max_x = 0.0
+            lim_loc_constr.use_min_y = axes[1]
+            lim_loc_constr.use_max_y = axes[1]
+            lim_loc_constr.min_y = 0.0
+            lim_loc_constr.max_y = 0.0
+            lim_loc_constr.use_min_z = axes[2]
+            lim_loc_constr.use_max_z = axes[2]
+            lim_loc_constr.min_z = 0.0
+            lim_loc_constr.max_z = 0.0
+            lim_loc_constr.owner_space = 'WORLD'
+            lim_loc_constr.influence = 1.0
+
+        elif lim_loc_constr:
+            target.constraints.remove(lim_loc_constr)
 
 
 def update_animation(self, context):
@@ -123,11 +131,87 @@ def update_animation(self, context):
         ob.animation_data.action_slot = action.slots[0]
 
     update_speed(self, context)
+    update_constraints(ob.animv_props, context)
         
     # reset frame to start
     scn = bpy.context.scene
     scn.frame_current = scn.frame_preview_start
     
+
+def get_max_displacement_vector(action, data_path, start_frame, end_frame):
+    fcurves = {
+        fcurve.array_index: fcurve
+        for fcurve in action.fcurves
+        if fcurve.data_path == data_path and fcurve.array_index < 3
+    }
+    sample_count = min(max(2, int(end_frame - start_frame) + 1), 120)
+    frames = [
+        start_frame + (end_frame - start_frame) * index / (sample_count - 1)
+        for index in range(sample_count)
+    ]
+    start_location = Vector((
+        fcurves[axis].evaluate(start_frame) if axis in fcurves else 0.0
+        for axis in range(3)
+    ))
+    max_displacement = Vector((0.0, 0.0, 0.0))
+    max_distance_squared = 0.0
+
+    for frame in frames[1:]:
+        location = Vector((
+            fcurves[axis].evaluate(frame) if axis in fcurves else 0.0
+            for axis in range(3)
+        ))
+        displacement = location - start_location
+        distance_squared = displacement.length_squared
+        if distance_squared > max_distance_squared:
+            max_distance_squared = distance_squared
+            max_displacement = displacement
+
+    return max_displacement
+
+
+def detect_inplace_axes(ob, action):
+    start_frame, end_frame = action.frame_range
+    world_rotation = ob.matrix_world.to_3x3()
+    world_axis_scores = [0.0, 0.0, 0.0]
+
+    if ob.type == 'ARMATURE':
+        roots = [bone for bone in ob.data.bones if bone.parent is None]
+        for bone in roots:
+            data_path = f'pose.bones["{bone.name}"].location'
+            displacement = get_max_displacement_vector(
+                action, data_path, start_frame, end_frame
+            )
+            world_displacement = (
+                world_rotation @ bone.matrix_local.to_3x3() @ displacement
+            )
+            for axis in range(3):
+                world_axis_scores[axis] += world_displacement[axis] ** 2
+    else:
+        displacement = get_max_displacement_vector(
+            action, 'location', start_frame, end_frame
+        )
+        world_displacement = world_rotation @ displacement
+        for axis in range(3):
+            world_axis_scores[axis] += world_displacement[axis] ** 2
+
+    if max(world_axis_scores) < 0.0001:
+        return (False, False, False)
+
+    axis = max(range(3), key=world_axis_scores.__getitem__)
+    result = [False, False, False]
+    result[axis] = True
+    return tuple(result)
+
+
+def get_inplace_axes(ob, props):
+    if props.inplace_axes == 'AUTO':
+        if ob.animation_data and ob.animation_data.action:
+            return detect_inplace_axes(ob, ob.animation_data.action)
+        return (False, False, False)
+
+    return tuple(axis in props.inplace_axes for axis in 'XYZ')
+
 
 #########################################################################################
 # OPERATORS
@@ -160,12 +244,10 @@ class ANIMV_OT_UnlinkAction(Operator):
         rnd.frame_map_old = 100
         rnd.frame_map_new = 100
 
-        # remove existing inplace constraint
-        for c in ob.constraints:
-            if c.name == LOCATION_CONSTRAINT_NAME:
-                ob.constraints.remove(c)
+        update_constraints(ob.animv_props, context)
         
         return{'FINISHED'}
+
 
 #########################################################################################
 # PANELS
@@ -239,7 +321,8 @@ class ANIMV_PT_Viewer(Panel):
         row.prop(props, 'pin_object', text="", icon='PINNED' if props.pin_object else 'UNPINNED')
         row.prop(bpy.context.scene, "use_preview_range", icon_only=True)
 
-        layout.prop(ob.animv_props, "inplace_axes", toggle = True) 
+        row = layout.row(align=True)
+        row.prop(ob.animv_props, "inplace_axes", text="Inplace")
 
         row = layout.row(align=True)
         row.label(text="Speed:")
@@ -258,12 +341,22 @@ class ANIMV_Object_Props(PropertyGroup):
         update=update_animation,
         description="Anim Viewer's highlighted action on list for this object"
     )
-    inplace_axes: BoolVectorProperty(
+    inplace_axes: EnumProperty(
         name="Inplace",
         description="Limit translations in these axes (Uses Constraints)",
         update=update_constraints,
-        default=(False, False, False),
-        subtype='XYZ',
+        items=[
+            ('NONE', 'None', 'Do not limit translation'),
+            ('AUTO', 'Auto', 'Detect primary translation axes from the active action'),
+            ('X', 'X', 'Limit X translation'),
+            ('Y', 'Y', 'Limit Y translation'),
+            ('Z', 'Z', 'Limit Z translation'),
+            ('XY', 'XY', 'Limit X and Y translation'),
+            ('XZ', 'XZ', 'Limit X and Z translation'),
+            ('YZ', 'YZ', 'Limit Y and Z translation'),
+            ('XYZ', 'XYZ', 'Limit X, Y, and Z translation'),
+        ],
+        default='NONE',
     )
 
 
